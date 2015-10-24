@@ -1,14 +1,14 @@
 #!/usr/bin/env node_modules/coffee-script/bin/coffee
 
 fs        = require('fs')
-request   = require('request')
+request   = require('request') # do stuff with http
 program   = require('commander')
-async     = require('async')
-_         = require('lodash')
+async     = require('async') # Better async 
+_         = require('lodash') # manu utilies
 exec      = require('child_process').exec
-moment    = require('moment')
+moment    = require('moment') # It is for the date
 cheerio   = require('cheerio')
-clc       = require('cli-color')
+clc       = require('cli-color') # With some nice color for terminal
 mangaUrls = require('./database')
 
 program
@@ -31,15 +31,33 @@ program
 # Shared variables
 pages      = {}
 pageAmount = {}
-host       = undefined
+host       = undefined  
+# It becomes void 0 always return undefined in pure javascript, because you can do var undefined = 'something'
+# undefined is not reserved.
 host       = undefined
 
 padding = (value, length) ->
-  String(('0' for i in [0...length]).join('') + value).slice(length * -1)
+  # Very simple, ('0' for i in [0...length])
+  # The i will be assigned with i = ref[index]
+  # result = [], result.push('0')
+  #
+  # Input: value = 1, length = 2
+  # Output will be "in steps"
+  # 1. ['0', '0'] (after the loop)
+  # 2. 001 (after the join)
+  # 3. '001'.slice(-2), grab the 2 elements from right
+  tmp_1 = ('0' for i in [0...length]).join('');
+  tmp_2 = tmp_1 + value;
+  tmp_3 = String(tmp_2);
+  tmp_4 = tmp_3.slice(length * -1)  
+
+  #String(('0' for i in [0...length]).join('') + value).slice(length * -1)
+  tmp_4
 
 createFolder = (folderPath) ->
   for path in folderPath.split '/'
-    initPath = "#{initPath || '.'}/#{path}"
+    initPath = "#{initPath || '.'}/#{path}" # So you can add more path head, #{path}. Every time it is building a new path
+    # You have to realize that initPath is incremental.
     fs.mkdirSync(initPath) unless fs.existsSync(initPath)
 
 imageDownload = (imgUri, i, paddedVol, paddedEp, ep) ->
@@ -48,14 +66,14 @@ imageDownload = (imgUri, i, paddedVol, paddedEp, ep) ->
       console.log clc.red "Oops, something went wrong. Error: #{err2}"
       return false
     if res2.headers['content-type'] is 'image/jpeg'
-      folderPath  = "manga/#{program.manga}/#{program.manga}-#{paddedVol}-#{paddedEp}"
+      folderPath  = "manga/#{program.manga}/#{program.manga}-#{paddedVol}-#{paddedEp}" # manga/one_piece/one_piece-001-001
       folderPath += "-#{program.pages}" if host is 'http://mangapark.com/' and program.pages
       fileName    = "#{padding(i, 3)}.jpg"
       filePath    = "./#{folderPath}/#{fileName}"
 
       createFolder(folderPath)
       request(uri: imgUri, timeout: 120 * 1000)
-        .pipe fs.createWriteStream(filePath)
+        .pipe fs.createWriteStream(filePath) # Write image to file
         .on 'finish', ->
           pages[ep].splice(pages[ep].indexOf(i), 1)
 
@@ -74,9 +92,19 @@ imageDownload = (imgUri, i, paddedVol, paddedEp, ep) ->
             process.stdout.write "\nRemaining (##{ep}): #{pages[ep].join(', ')}" if pages[ep].length
 
 mangaDownload = (vol, ep) ->
-  fraction  = if ep.match /\./ then _.last(ep.split('.')) else false
-  ep        = ep.split('.')[0]
+  fraction  = if ep.match /\./ then _.last(ep.split('.')) else false # It asks for last part
+  ep        = ep.split('.')[0] # It asks for the 1st part.
+
+  # program is the commander lib
+  # format is
+  # 1 -> url/v01/c001
+  # 2 -> url/v1/c1
+  # 3 -> url/c1
+  # 4 -> url/c001.1.2
   format    = mangaUrls[program.manga].format
+
+  # 'http://mangafox.me/manga/one_piece/v01/c001/' is format 1
+
   format    = 4 if format is 2 and not vol
   uri       = switch format
               when 1 then "#{mangaUrls[program.manga].url}/v#{if vol is 'TBD' then 'TBD' else padding(vol, 2)}/c#{padding(ep, 3)}/"
@@ -91,6 +119,7 @@ mangaDownload = (vol, ep) ->
   host      = mangaUrls[program.manga].url.match(/http:\/\/[.\w\d]+\//) || []
   host      = host[0]
 
+  # mangapark is diff
   if host is 'http://mangapark.com/'
     if program.pages
       uri += "10-#{program.pages}"
@@ -99,7 +128,15 @@ mangaDownload = (vol, ep) ->
 
   console.log uri
 
+  # code
+  # return request({
+  #      uri: uri
+  #   }, function(err, res, body) {
+  #   .....
+  # });
+  # so uri: uri, it is a json input, (err, res, body) is the callback 
   request uri: uri, (err, res, body) ->
+
     if err or res.statusCode isnt 200
       console.log clc.red "Oops, something went wrong #{'(Error: ' + res.statusCode + ')'if res}"
       return false
@@ -115,24 +152,31 @@ mangaDownload = (vol, ep) ->
 
     # Other sites
     else
+      # host === http://mangafox.me/
+      # uri === 'http://mangafox.me/manga/one_piece/v01/c001/'
       pageAmount[ep] = switch host
-                   when 'http://mangafox.me/' then $('form#top_bar select.m option').length
+                   when 'http://mangafox.me/' then $('form#top_bar select.m option').length # 56 pages
                    else                            $('section.readpage_top select.wid60 option').length
-      pages[ep] = program.pages || [0..pageAmount[ep]]
+      pages[ep] = program.pages || [0..pageAmount[ep]] # so it becomes [1, 2, 3, ... 56]
       # uri = uri.slice(0, -1) if uri.match /\/$/  # Remove trailing `/`
 
       console.log clc.green "Downloading up to #{pages[ep].length} page(s)"
       for i in _.clone pages[ep]
+      
         do (i) ->
           request uri: "#{uri}#{ if i > 0 then i + '.html' else ''  }", followRedirect: false, (err, res, body) ->
             $$ = cheerio.load(body)
 
-            if err or res.statusCode isnt 200
+            if err or res.statusCode isnt 200 
               pages[ep].splice(pages[ep].indexOf(i), 1)
             else
               img = $$('img#image')
 
               unless img.length
+                my_tmp_1 = pages[ep]; #[1, 2, .... 56]
+                my_tmp_2 = pages[ep].indexOf(i) # 7
+                my_tmp_3 = pages[ep].splice(pages[ep].indexOf(i), 1) # [7]
+
                 pages[ep].splice(pages[ep].indexOf(i), 1)
               else
                 imgUri = switch host
