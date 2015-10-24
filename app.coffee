@@ -62,19 +62,24 @@ createFolder = (folderPath) ->
 
 imageDownload = (imgUri, i, paddedVol, paddedEp, ep) ->
   request.head uri: imgUri, followRedirect: false, (err2, res2, body2) ->
+
     if err2 or res2.statusCode isnt 200
       console.log clc.red "Oops, something went wrong. Error: #{err2}"
       return false
     if res2.headers['content-type'] is 'image/jpeg'
       folderPath  = "manga/#{program.manga}/#{program.manga}-#{paddedVol}-#{paddedEp}" # manga/one_piece/one_piece-001-001
-      folderPath += "-#{program.pages}" if host is 'http://mangapark.com/' and program.pages
-      fileName    = "#{padding(i, 3)}.jpg"
-      filePath    = "./#{folderPath}/#{fileName}"
+      folderPath += "-#{program.pages}" if host is 'http://mangapark.com/' and program.pages # folderPath === manga/one_piece/one_piece-001-001
+      fileName    = "#{padding(i, 3)}.jpg" # '008.jpg', so i is page num, and it is backward
+      filePath    = "./#{folderPath}/#{fileName}" # ./manga/one_piece/one_piece-001-001/008.jpg
 
       createFolder(folderPath)
       request(uri: imgUri, timeout: 120 * 1000)
-        .pipe fs.createWriteStream(filePath) # Write image to file
+        .pipe fs.createWriteStream(filePath) # Get the request result, then stream to file
         .on 'finish', ->
+
+          # test
+          debugger;
+
           pages[ep].splice(pages[ep].indexOf(i), 1)
 
           # Since iOS seems to sort images by created date, this should do the trick.
@@ -179,6 +184,12 @@ mangaDownload = (vol, ep) ->
 
                 pages[ep].splice(pages[ep].indexOf(i), 1)
               else
+                
+                # test
+                debugger
+
+
+                # imgUri === 'http://c.mfcdn.net/store/manga/106/01-001.0/compressed/f002.jpg', from img src
                 imgUri = switch host
                          when 'http://mangafox.me/' then img.attr('onerror').match(/http.+jpg/)[0]  # New manga seems to fallback to another CDN
                          else                            img.attr('src')
