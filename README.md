@@ -1,3 +1,5 @@
+### Hack into source code and learn
+
 Manga Fetcher fetches and downloads manga images to your machine!
 
 ### Requirements
